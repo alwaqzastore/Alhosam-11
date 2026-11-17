@@ -51,8 +51,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK & Required Packages
         uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36 & Build Tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0"
 
       - name: Setup Gradle Cache
         uses: gradle/actions/setup-gradle@v4
@@ -62,7 +67,7 @@ jobs:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ] && [ ! -f "android/app/google-services.json" ]; then
-            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/google-services.json
             echo "Restored android/app/google-services.json from secret."
           else
             echo "Using existing Firebase configuration in project."
@@ -78,7 +83,10 @@ jobs:
         run: |
           SIGNING_MODE="debug-fallback"
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/android/app/release.keystore"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "${{ github.workspace }}/android/app/release.keystore"
+            if [ -n "$ANDROID_KEYSTORE_PASSWORD" ]; then
+              keytool -list -keystore "${{ github.workspace }}/android/app/release.keystore" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null
+            fi
             echo "ANDROID_KEYSTORE_PATH=${{ github.workspace }}/android/app/release.keystore" >> "$GITHUB_ENV"
             SIGNING_MODE="release-secret"
           elif [ -f "android/keystore.properties" ]; then
@@ -103,9 +111,9 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew clean assembleRelease bundleRelease --no-daemon --stacktrace
+          ./gradlew clean assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
 
-      - name: Verify and Package Build Outputs
+      - name: Verify and Package app-release.apk & app-release.aab
         id: collect_outputs
         run: |
           mkdir -p release-artifacts
@@ -113,41 +121,41 @@ jobs:
           AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -n 1 || true)
 
           if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "::error::APK file was not generated!"
+            echo "::error::app-release.apk was not generated!"
             exit 1
           fi
           if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "::error::AAB file was not generated!"
+            echo "::error::app-release.aab was not generated!"
             exit 1
           fi
 
-          APK_OUT="release-artifacts/alhosam-grocery-v1.0.${{ github.run_number }}.apk"
-          AAB_OUT="release-artifacts/alhosam-grocery-v1.0.${{ github.run_number }}.aab"
+          cp "$APK_FILE" "release-artifacts/app-release.apk"
+          cp "$AAB_FILE" "release-artifacts/app-release.aab"
 
-          cp "$APK_FILE" "$APK_OUT"
-          cp "$AAB_FILE" "$AAB_OUT"
+          unzip -tq "release-artifacts/app-release.apk" >/dev/null
+          unzip -tq "release-artifacts/app-release.aab" >/dev/null
 
-          echo "apk_path=$APK_OUT" >> "$GITHUB_OUTPUT"
-          echo "aab_path=$AAB_OUT" >> "$GITHUB_OUTPUT"
-          echo "apk_size=$(du -h "$APK_OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "aab_size=$(du -h "$AAB_OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "apk_path=release-artifacts/app-release.apk" >> "$GITHUB_OUTPUT"
+          echo "aab_path=release-artifacts/app-release.aab" >> "$GITHUB_OUTPUT"
+          echo "apk_size=$(du -h release-artifacts/app-release.apk | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "aab_size=$(du -h release-artifacts/app-release.aab | cut -f1)" >> "$GITHUB_OUTPUT"
 
           ls -lh release-artifacts/
 
-      - name: Upload APK Artifact
+      - name: Upload app-release.apk Artifact
         id: upload_apk
         uses: actions/upload-artifact@v4
         with:
-          name: alhosam-android-apk
+          name: app-release.apk
           path: ${{ steps.collect_outputs.outputs.apk_path }}
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload AAB Artifact
+      - name: Upload app-release.aab Artifact
         id: upload_aab
         uses: actions/upload-artifact@v4
         with:
-          name: alhosam-android-aab
+          name: app-release.aab
           path: ${{ steps.collect_outputs.outputs.aab_path }}
           retention-days: 30
           if-no-files-found: error
@@ -163,8 +171,8 @@ jobs:
             echo ""
             if [ "${{ job.status }}" == "success" ]; then
               echo "### ⬇️ روابط التنزيل المباشرة (GitHub Actions Artifacts)"
-              echo "- **ملف APK (${{ steps.collect_outputs.outputs.apk_size }}):** [تنزيل APK](${{ steps.upload_apk.outputs.artifact-url }})"
-              echo "- **ملف AAB (${{ steps.collect_outputs.outputs.aab_size }}):** [تنزيل AAB](${{ steps.upload_aab.outputs.artifact-url }})"
+              echo "- **app-release.apk (${{ steps.collect_outputs.outputs.apk_size }}):** [تنزيل app-release.apk](${{ steps.upload_apk.outputs.artifact-url }})"
+              echo "- **app-release.aab (${{ steps.collect_outputs.outputs.aab_size }}):** [تنزيل app-release.aab](${{ steps.upload_aab.outputs.artifact-url }})"
             else
               echo "⚠️ فشل البناء — راجع سجلات Gradle أعلاه."
             fi

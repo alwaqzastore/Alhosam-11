@@ -9,7 +9,7 @@ if (keystorePropertiesFile.exists()) {
 def releaseStoreFilePath = System.getenv("ANDROID_KEYSTORE_PATH") ?: keystoreProperties.getProperty("storeFile")
 def releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
 def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
-def releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
+def releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword") ?: releaseStorePassword
 
 def resolvedStoreFile = null
 if (releaseStoreFilePath != null && !releaseStoreFilePath.trim().isEmpty()) {
@@ -27,6 +27,12 @@ def hasReleaseKeystore = resolvedStoreFile != null &&
     releaseKeyAlias != null && !releaseKeyAlias.isEmpty() &&
     releaseKeyPassword != null && !releaseKeyPassword.isEmpty()
 
+def resolvedVersionCode = 1
+def envVersionCode = System.getenv("CI_VERSION_CODE")
+if (envVersionCode != null && envVersionCode.trim().isInteger()) {
+    resolvedVersionCode = Math.max(1, envVersionCode.trim().toInteger())
+}
+
 android {
     namespace = "com.alhosam.pos"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -34,7 +40,7 @@ android {
         applicationId "com.alhosam.pos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("CI_VERSION_CODE") ? System.getenv("CI_VERSION_CODE").toInteger() : 1)
+        versionCode resolvedVersionCode
         versionName (System.getenv("CI_VERSION_NAME") ?: "1.0.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
