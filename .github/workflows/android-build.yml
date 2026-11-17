@@ -1,0 +1,171 @@
+name: Build Android APK & AAB (بقالة الحسام)
+
+on:
+  push:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build APK & AAB via Gradle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: TypeScript Check & Web Production Build
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Sync Capacitor Android Project
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore Optional Native Firebase Config (google-services.json)
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ] && [ ! -f "android/app/google-services.json" ]; then
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+            echo "Restored android/app/google-services.json from secret."
+          else
+            echo "Using existing Firebase configuration in project."
+          fi
+
+      - name: Prepare Original Signing Keystore
+        id: signing_setup
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          SIGNING_MODE="debug-fallback"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/android/app/release.keystore"
+            echo "ANDROID_KEYSTORE_PATH=${{ github.workspace }}/android/app/release.keystore" >> "$GITHUB_ENV"
+            SIGNING_MODE="release-secret"
+          elif [ -f "android/keystore.properties" ]; then
+            SIGNING_MODE="keystore-properties"
+          else
+            EXISTING_KS=$(find android -maxdepth 3 \( -name "*.jks" -o -name "*.keystore" \) ! -name "debug.keystore" | head -n 1 || true)
+            if [ -n "$EXISTING_KS" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ]; then
+              echo "ANDROID_KEYSTORE_PATH=${{ github.workspace }}/${EXISTING_KS}" >> "$GITHUB_ENV"
+              SIGNING_MODE="repo-keystore-with-secret-creds"
+            fi
+          fi
+          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+          echo "CI_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "CI_VERSION_NAME=1.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "Detected signing mode: $SIGNING_MODE"
+
+      - name: Build Android APK and AAB with Gradle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew clean assembleRelease bundleRelease --no-daemon --stacktrace
+
+      - name: Verify and Package Build Outputs
+        id: collect_outputs
+        run: |
+          mkdir -p release-artifacts
+          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1 || true)
+          AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -n 1 || true)
+
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "::error::APK file was not generated!"
+            exit 1
+          fi
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "::error::AAB file was not generated!"
+            exit 1
+          fi
+
+          APK_OUT="release-artifacts/alhosam-grocery-v1.0.${{ github.run_number }}.apk"
+          AAB_OUT="release-artifacts/alhosam-grocery-v1.0.${{ github.run_number }}.aab"
+
+          cp "$APK_FILE" "$APK_OUT"
+          cp "$AAB_FILE" "$AAB_OUT"
+
+          echo "apk_path=$APK_OUT" >> "$GITHUB_OUTPUT"
+          echo "aab_path=$AAB_OUT" >> "$GITHUB_OUTPUT"
+          echo "apk_size=$(du -h "$APK_OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "aab_size=$(du -h "$AAB_OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
+
+          ls -lh release-artifacts/
+
+      - name: Upload APK Artifact
+        id: upload_apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: alhosam-android-apk
+          path: ${{ steps.collect_outputs.outputs.apk_path }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload AAB Artifact
+        id: upload_aab
+        uses: actions/upload-artifact@v4
+        with:
+          name: alhosam-android-aab
+          path: ${{ steps.collect_outputs.outputs.aab_path }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish Build Summary & Direct Download Links
+        if: always()
+        run: |
+          {
+            echo "## 📦 بناء تطبيق بقالة الحسام (Android)"
+            echo ""
+            echo "- **الإصدار:** \`1.0.${{ github.run_number }}\` (versionCode: \`${{ github.run_number }}\`)"
+            echo "- **وضع التوقيع:** \`${{ steps.signing_setup.outputs.signing_mode }}\`"
+            echo ""
+            if [ "${{ job.status }}" == "success" ]; then
+              echo "### ⬇️ روابط التنزيل المباشرة (GitHub Actions Artifacts)"
+              echo "- **ملف APK (${{ steps.collect_outputs.outputs.apk_size }}):** [تنزيل APK](${{ steps.upload_apk.outputs.artifact-url }})"
+              echo "- **ملف AAB (${{ steps.collect_outputs.outputs.aab_size }}):** [تنزيل AAB](${{ steps.upload_aab.outputs.artifact-url }})"
+            else
+              echo "⚠️ فشل البناء — راجع سجلات Gradle أعلاه."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
