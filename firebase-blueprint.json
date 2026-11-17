@@ -1,0 +1,449 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Authenticated shop staff member or primary administrator with role-based permissions.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "inviteId": { "type": "string", "maxLength": 128 },
+        "permissions": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "permissions", "createdAt", "updatedAt"]
+    },
+    "StaffInvite": {
+      "title": "StaffInvite",
+      "description": "Pre-authorized staff invitation created by Admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "permissions": { "type": "object" },
+        "claimedUid": { "type": "string", "maxLength": 128 },
+        "createdBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "displayName", "role", "status", "permissions", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Physical store shelf, cold room, or warehouse storage location.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "location": { "type": "string", "maxLength": 200 },
+        "isDefault": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "createdBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "code", "name", "isDefault", "isActive", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Grocery inventory item with unique SKU, barcode, expiry date, warehouse, and damaged stock isolation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barcode": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "category": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 500 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "purchasePrice": { "type": "number" },
+        "salePrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "damagedQuantity": { "type": "number" },
+        "minStock": { "type": "number" },
+        "expiryDate": { "type": "string", "maxLength": 20 },
+        "warehouseId": { "type": "string", "maxLength": 128 },
+        "warehouseName": { "type": "string", "maxLength": 100 },
+        "isActive": { "type": "boolean" },
+        "createdBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "code", "name", "unit", "purchasePrice", "salePrice", "quantity", "minStock", "isActive", "createdBy", "createdAt", "updatedAt"]
+    },
+    "ProductCodeLock": {
+      "title": "ProductCodeLock",
+      "description": "Unique SKU lock document.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "productId", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Shop customer profile tracking purchases, paid totals, and outstanding debt balance.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "address": { "type": "string", "maxLength": 250 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "totalPurchases": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "balanceDue": { "type": "number" },
+        "createdBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "code", "name", "totalPurchases", "totalPaid", "balanceDue", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Merchandise supplier tracking total purchases, paid totals, and payable balances.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "address": { "type": "string", "maxLength": 250 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "totalPurchases": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "balanceDue": { "type": "number" },
+        "createdBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "code", "name", "totalPurchases", "totalPaid", "balanceDue", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Point-of-sale invoice.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "invoiceNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerCode": { "type": "string", "maxLength": 64 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "netProfit": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "credit", "partial"] },
+        "status": { "type": "string", "enum": ["completed", "partially_returned", "returned", "cancelled"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "invoiceNumber", "customerName", "employeeId", "employeeName", "items", "subtotal", "discount", "totalAmount", "totalCost", "netProfit", "paidAmount", "remainingAmount", "paymentMethod", "status", "createdAt", "updatedAt"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Supplier purchase invoice.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "invoiceNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "supplierName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "supplierPhone": { "type": "string", "maxLength": 30 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "credit", "partial"] },
+        "status": { "type": "string", "enum": ["received", "partially_returned", "returned", "cancelled"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "invoiceNumber", "supplierId", "supplierName", "employeeId", "employeeName", "items", "totalAmount", "paidAmount", "remainingAmount", "paymentMethod", "status", "createdAt", "updatedAt"]
+    },
+    "SaleReturn": {
+      "title": "SaleReturn",
+      "description": "Customer sale return or invoice cancellation record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "returnNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "saleId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "type": { "type": "string", "enum": ["return", "cancel"] },
+        "items": { "type": "array" },
+        "totalRefund": { "type": "number" },
+        "cashRefunded": { "type": "number" },
+        "debtReduced": { "type": "number" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "returnNumber", "saleId", "invoiceNumber", "customerName", "employeeId", "employeeName", "type", "items", "totalRefund", "cashRefunded", "debtReduced", "reason", "createdAt"]
+    },
+    "PurchaseReturn": {
+      "title": "PurchaseReturn",
+      "description": "Supplier purchase return deducting inventory and adjusting supplier payable or cash.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "returnNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "purchaseId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "supplierName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "items": { "type": "array" },
+        "totalRefund": { "type": "number" },
+        "cashRefunded": { "type": "number" },
+        "debtReduced": { "type": "number" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "returnNumber", "purchaseId", "invoiceNumber", "supplierId", "supplierName", "employeeId", "employeeName", "items", "totalRefund", "cashRefunded", "debtReduced", "reason", "createdAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Chart of Accounts node for double-entry accounting.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "type": { "type": "string", "enum": ["asset", "liability", "equity", "revenue", "expense"] },
+        "normalBalance": { "type": "string", "enum": ["debit", "credit"] },
+        "balance": { "type": "number" },
+        "isSystem": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "code", "name", "type", "normalBalance", "balance", "isSystem", "createdAt", "updatedAt"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Balanced double-entry accounting journal entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "entryNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "sourceType": { "type": "string", "enum": ["sale", "purchase", "sale_return", "purchase_return", "voucher", "stock_adjustment", "manual", "reversal"] },
+        "sourceId": { "type": "string", "maxLength": 128 },
+        "sourceNumber": { "type": "string", "maxLength": 64 },
+        "lines": { "type": "array" },
+        "totalDebit": { "type": "number" },
+        "totalCredit": { "type": "number" },
+        "status": { "type": "string", "enum": ["posted", "reversed"] },
+        "reversedByEntryId": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "entryNumber", "description", "sourceType", "lines", "totalDebit", "totalCredit", "status", "employeeId", "employeeName", "createdAt"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Immutable inventory ledger entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "productCode": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "productName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "type": { "type": "string", "enum": ["sale", "purchase", "return", "purchase_return", "adjustment_in", "adjustment_out", "stocktake", "opening", "warehouse_transfer"] },
+        "quantityChange": { "type": "number" },
+        "previousQty": { "type": "number" },
+        "newQty": { "type": "number" },
+        "warehouseName": { "type": "string", "maxLength": 100 },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "referenceNumber": { "type": "string", "maxLength": 64 },
+        "reason": { "type": "string", "maxLength": 300 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "productId", "productCode", "productName", "type", "quantityChange", "previousQty", "newQty", "employeeId", "employeeName", "createdAt"]
+    },
+    "Stocktake": {
+      "title": "Stocktake",
+      "description": "Physical inventory count session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "stocktakeNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "items": { "type": "array" },
+        "totalVarianceValue": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "stocktakeNumber", "employeeId", "employeeName", "items", "totalVarianceValue", "createdAt"]
+    },
+    "Voucher": {
+      "title": "Voucher",
+      "description": "Financial receipt, payment, or expense voucher.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "voucherNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "type": { "type": "string", "enum": ["receipt", "payment", "expense"] },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "partyType": { "type": "string", "enum": ["customer", "supplier", "general"] },
+        "partyId": { "type": "string", "maxLength": 128 },
+        "partyName": { "type": "string", "maxLength": 120 },
+        "amount": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 400 },
+        "employeeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "voucherNumber", "type", "category", "partyType", "amount", "employeeId", "employeeName", "createdAt"]
+    },
+    "Counter": {
+      "title": "Counter",
+      "description": "Sequential numbering counter.",
+      "type": "object",
+      "properties": {
+        "seq": { "type": "number" },
+        "prefix": { "type": "string", "minLength": 1, "maxLength": 16 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["seq", "prefix", "updatedAt"]
+    },
+    "SettingsDoc": {
+      "title": "SettingsDoc",
+      "description": "Shop settings or treasury cash summary.",
+      "type": "object",
+      "properties": {
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit log entries.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "action": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "entityType": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "entityId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "actorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "actorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "actorRole": { "type": "string", "enum": ["admin", "employee"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "entityType", "entityId", "summary", "actorId", "actorName", "actorRole", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Staff and administrator account profiles and permissions"
+    },
+    "/staffInvites/{inviteId}": {
+      "schema": { "$ref": "#/entities/StaffInvite" },
+      "description": "Pre-authorized staff invitations created by Admin"
+    },
+    "/warehouses/{warehouseId}": {
+      "schema": { "$ref": "#/entities/Warehouse" },
+      "description": "Store warehouses and storage locations"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catalog of grocery products with SKUs, expiry dates, and stock levels"
+    },
+    "/productCodes/{codeId}": {
+      "schema": { "$ref": "#/entities/ProductCodeLock" },
+      "description": "Unique product SKU lock documents"
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Registered customers and debt balances"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/entities/Supplier" },
+      "description": "Merchandise suppliers and payable balances"
+    },
+    "/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Point-of-sale invoices"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/Purchase" },
+      "description": "Supplier purchase invoices"
+    },
+    "/returns/{returnId}": {
+      "schema": { "$ref": "#/entities/SaleReturn" },
+      "description": "Customer returns and cancelled invoice records"
+    },
+    "/purchase_returns/{returnId}": {
+      "schema": { "$ref": "#/entities/PurchaseReturn" },
+      "description": "Supplier purchase return records"
+    },
+    "/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "Double-entry Chart of Accounts"
+    },
+    "/journal_entries/{entryId}": {
+      "schema": { "$ref": "#/entities/JournalEntry" },
+      "description": "Balanced double-entry journal entries"
+    },
+    "/stock_movements/{movementId}": {
+      "schema": { "$ref": "#/entities/StockMovement" },
+      "description": "Inventory movement ledger"
+    },
+    "/stocktakes/{stocktakeId}": {
+      "schema": { "$ref": "#/entities/Stocktake" },
+      "description": "Physical stocktake records"
+    },
+    "/vouchers/{voucherId}": {
+      "schema": { "$ref": "#/entities/Voucher" },
+      "description": "Financial receipt, payment, and expense vouchers"
+    },
+    "/counters/{counterId}": {
+      "schema": { "$ref": "#/entities/Counter" },
+      "description": "Atomic sequential number counters"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SettingsDoc" },
+      "description": "Shop settings and cash treasury balance"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable audit log entries"
+    }
+  }
+}

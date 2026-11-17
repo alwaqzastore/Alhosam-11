@@ -1,0 +1,6 @@
+{
+  "name": "ميزان برو - النظام المحاسبي وإدارة المتاجر",
+  "description": "نظام محاسبي سحابي متكامل لإدارة المحلات التجارية والمبيعات والمخزون والعملاء والموردين والحسابات المالية لحظة بلحظة",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
