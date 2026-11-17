@@ -6,6 +6,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
@@ -117,15 +120,21 @@ jobs:
         id: collect_outputs
         run: |
           mkdir -p release-artifacts
-          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1 || true)
-          AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -n 1 || true)
+          APK_FILE=$(find android/app/build/outputs/apk/release -name "app-release.apk" | head -n 1 || true)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" ! -name "*-unsigned.apk" | head -n 1 || true)
+          fi
+          AAB_FILE=$(find android/app/build/outputs/bundle/release -name "app-release.aab" | head -n 1 || true)
+          if [ -z "$AAB_FILE" ]; then
+            AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" | head -n 1 || true)
+          fi
 
-          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "::error::app-release.apk was not generated!"
+          if [ -z "$APK_FILE" ] || [ ! -s "$APK_FILE" ]; then
+            echo "::error::app-release.apk was not generated or is empty!"
             exit 1
           fi
-          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "::error::app-release.aab was not generated!"
+          if [ -z "$AAB_FILE" ] || [ ! -s "$AAB_FILE" ]; then
+            echo "::error::app-release.aab was not generated or is empty!"
             exit 1
           fi
 
@@ -134,6 +143,11 @@ jobs:
 
           unzip -tq "release-artifacts/app-release.apk" >/dev/null
           unzip -tq "release-artifacts/app-release.aab" >/dev/null
+
+          APKSIGNER_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$APKSIGNER_BIN" ] && [ -x "$APKSIGNER_BIN" ]; then
+            "$APKSIGNER_BIN" verify --verbose "release-artifacts/app-release.apk"
+          fi
 
           echo "apk_path=release-artifacts/app-release.apk" >> "$GITHUB_OUTPUT"
           echo "aab_path=release-artifacts/app-release.aab" >> "$GITHUB_OUTPUT"
@@ -160,6 +174,31 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Publish Direct Download Release (APK & AAB)
+        id: publish_release
+        if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'master' || github.event_name == 'workflow_dispatch')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          TITLE="بقالة الحسام - Android Release ${TAG}"
+          NOTES="تم بناء وتجهيز ملفات app-release.apk و app-release.aab تلقائياً (وضع التوقيع: ${{ steps.signing_setup.outputs.signing_mode }})."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "${{ steps.collect_outputs.outputs.apk_path }}" \
+              "${{ steps.collect_outputs.outputs.aab_path }}" \
+              --clobber
+          else
+            gh release create "$TAG" \
+              "${{ steps.collect_outputs.outputs.apk_path }}" \
+              "${{ steps.collect_outputs.outputs.aab_path }}" \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi
+          RELEASE_URL=$(gh release view "$TAG" --json url --jq .url || true)
+          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+
       - name: Publish Build Summary & Direct Download Links
         if: always()
         run: |
@@ -173,6 +212,11 @@ jobs:
               echo "### ⬇️ روابط التنزيل المباشرة (GitHub Actions Artifacts)"
               echo "- **app-release.apk (${{ steps.collect_outputs.outputs.apk_size }}):** [تنزيل app-release.apk](${{ steps.upload_apk.outputs.artifact-url }})"
               echo "- **app-release.aab (${{ steps.collect_outputs.outputs.aab_size }}):** [تنزيل app-release.aab](${{ steps.upload_aab.outputs.artifact-url }})"
+              if [ -n "${{ steps.publish_release.outputs.release_url }}" ]; then
+                echo ""
+                echo "### 🚀 تنزيل مباشر بدون ضغط ZIP (GitHub Release)"
+                echo "- [فتح صفحة الإصدار وتنزيل APK و AAB مباشرة](${{ steps.publish_release.outputs.release_url }})"
+              fi
             else
               echo "⚠️ فشل البناء — راجع سجلات Gradle أعلاه."
             fi
